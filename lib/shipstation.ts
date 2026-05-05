@@ -1,0 +1,7 @@
+type InventoryTransaction = { sku: string; quantity: number; inventory_location_id: string };
+
+function shipstationConfig() { const apiKey = process.env.SHIPSTATION_API_KEY; if (!apiKey) throw new Error("SHIPSTATION_API_KEY is required."); return { apiKey, baseUrl: process.env.SHIPSTATION_API_BASE_URL || "https://api.shipstation.com" }; }
+async function request<T>(path: string, init?: RequestInit): Promise<T> { const { apiKey, baseUrl } = shipstationConfig(); const response = await fetch(`${baseUrl}${path}`, { ...init, headers: { "api-key": apiKey, "content-type": "application/json", ...(init?.headers || {}) } }); const text = await response.text(); const body = text ? JSON.parse(text) : null; if (!response.ok) throw new Error(body?.message || body?.errors?.[0]?.message || `ShipStation request failed with ${response.status}`); return body as T; }
+export async function incrementInventory(transaction: InventoryTransaction) { const payload = { sku: transaction.sku, quantity: transaction.quantity, inventory_location_id: transaction.inventory_location_id, transaction_type: "increment" }; const response = await request<unknown>("/v2/inventory", { method: "POST", body: JSON.stringify(payload) }); return { payload, response }; }
+export async function listInventoryLocations() { return request<unknown>("/v2/inventory_locations"); }
+export async function lookupInventoryBySku(sku: string) { return request<unknown>(`/v2/inventory?sku=${encodeURIComponent(sku)}`); }

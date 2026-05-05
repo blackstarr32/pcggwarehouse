@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  RECEIVER
+}
+
+enum ReceiptStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  role         UserRole  @default(RECEIVER)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  receipts     Receipt[]
+}
+
+model Warehouse {
+  id                    String        @id @default(cuid())
+  name                  String        @unique
+  shipstationWarehouseId String?
+  active                Boolean       @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  bins                  BinLocation[]
+  products              Product[]
+  receipts              Receipt[]
+  @@index([active])
+}
+
+model BinLocation {
+  id                         String    @id @default(cuid())
+  warehouseId                String
+  zone                       String
+  aisle                      String
+  rack                       String
+  level                      String
+  label                      String
+  shipstationInventoryLocationId String?
+  isHold                     Boolean   @default(false)
+  active                     Boolean   @default(true)
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  warehouse                  Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  receipts                   Receipt[]
+  @@unique([warehouseId, zone, aisle, rack, level])
+  @@index([warehouseId, isHold])
+}
+
+model Product {
+  id                String      @id @default(cuid())
+  sku               String
+  name              String
+  thumbnailUrl      String?
+  category          String?
+  tag1              String?
+  tag2              String?
+  tag3              String?
+  tag4              String?
+  tag5              String?
+  active            Boolean     @default(true)
+  warehouseId       String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  warehouse         Warehouse?  @relation(fields: [warehouseId], references: [id])
+  upcs              ProductUpc[]
+  receipts          Receipt[]
+  @@unique([sku, warehouseId])
+  @@index([sku])
+}
+
+model ProductUpc {
+  id        String   @id @default(cuid())
+  productId String
+  upc       String
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@unique([upc, productId])
+  @@index([upc])
+}
+
+model Receipt {
+  id               String        @id @default(cuid())
+  userId           String
+  productId        String
+  warehouseId      String
+  binLocationId    String?
+  scannedUpc       String
+  sku              String
+  quantity         Int
+  skippedBin       Boolean       @default(false)
+  status           ReceiptStatus @default(PENDING)
+  shipstationRequest Json?
+  shipstationResponse Json?
+  errorMessage     String?
+  retryCount       Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  syncedAt         DateTime?
+  user             User          @relation(fields: [userId], references: [id])
+  product          Product       @relation(fields: [productId], references: [id])
+  warehouse        Warehouse     @relation(fields: [warehouseId], references: [id])
+  binLocation      BinLocation?  @relation(fields: [binLocationId], references: [id])
+  @@index([status, createdAt])
+  @@index([sku])
+}
+
+model ImportBatch {
+  id           String   @id @default(cuid())
+  type         String
+  filename     String
+  rowCount     Int
+  warningCount Int      @default(0)
+  warnings     Json?
+  createdAt    DateTime @default(now())
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,6 @@
+import { prisma } from "@/lib/prisma";
+
+export async function getSetting(key: string) { const setting = await prisma.appSetting.findUnique({ where: { key } }); return setting?.value || null; }
+export async function setSetting(key: string, value: string) { return prisma.appSetting.upsert({ where: { key }, update: { value }, create: { key, value } }); }
+export async function getActiveWarehouse() { const configuredId = await getSetting("activeWarehouseId"); if (configuredId) { const warehouse = await prisma.warehouse.findUnique({ where: { id: configuredId } }); if (warehouse) return warehouse; } const warehouse = await prisma.warehouse.findFirst({ where: { active: true }, orderBy: { createdAt: "asc" } }); if (warehouse) return warehouse; return prisma.warehouse.create({ data: { name: process.env.ACTIVE_WAREHOUSE_NAME || "Dallas Warehouse", active: true } }); }
+export async function getReceivingHoldLocation(warehouseId: string) { const configuredId = await getSetting("receivingHoldBinLocationId"); if (configuredId) { const bin = await prisma.binLocation.findFirst({ where: { id: configuredId, warehouseId } }); if (bin) return bin; } return prisma.binLocation.findFirst({ where: { warehouseId, isHold: true, active: true } }); }
